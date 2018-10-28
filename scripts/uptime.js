@@ -1,22 +1,22 @@
 // Description:
-//	This script checks a list of websites found in config/config.js and notifies the web admin via
-//	Slack if the sites are down. The bot runs a cronjob every minute to monitor the sites
+// 	This script checks a list of websites found in config/config.js and notifies the web admin via
+// 	Slack if the sites are down. The bot runs a cronjob every minute to monitor the sites
 
 // Configuration:
-//	You will need to set a valid HUBOT_SLACK_TOKEN provided by the Slack API to run this bot
+// 	You will need to set a valid HUBOT_SLACK_TOKEN provided by the Slack API to run this bot
 
 // Commands:
-//	hubot which sites - Lists the sites you are currently watching
-//	check - Runs a check on all sites you are monitoring
-//  hubot add <domain> - Adds <domain> to the sites to monitor and check
-// 	hubot del <domain> - Deletes <domain> from the monitored sites
+//    check - Runs a check on all sites you are monitoring
+// 	  hubot which sites - Lists the sites you are currently watching
+//    hubot add domain - Adds <domain> to the sites to monitor and check
+// 	  hubot del domain - Deletes <domain> from the monitored sites
+
 require("dotenv").config();
 const isReachable = require("is-reachable");
-const CronJob = require("cron").CronJob;
+const { CronJob } = require("cron");
 const config = require("../config/config.js");
-const skyss = require("../tools/skyss.js");
-const moment = require("moment");
 const Influx = require("influx");
+
 const influx = new Influx.InfluxDB({
   host: process.env.INFLUX_HOST,
   database: process.env.INFLUX_DB,
@@ -50,10 +50,14 @@ module.exports = function(bot) {
     }
     res.send(
       `Sjekker ${
-        sites.length > 1 ? sites.length + " sider" : sites.length + " side"
+        sites.length > 1 ? `${sites.length} sider` : `${sites.length} side`
       }`
     );
     checkSites(true);
+  });
+
+  bot.respond(/config/i, res => {
+    res.send(`Configen min er ${JSON.stringify(config)}`);
   });
 
   bot.respond(/(which sites|ws)/i, res => {
@@ -70,7 +74,7 @@ module.exports = function(bot) {
   bot.respond(/add (.*)/i, res => {
     if (res.match[1]) {
       const url = res.match[1];
-      let sites = bot.brain.data.sites;
+      const sites = bot.brain.data.sites;
       sites.push(url);
       bot.brain.data.sites = sites;
       res.send(
@@ -84,8 +88,8 @@ module.exports = function(bot) {
   bot.respond(/del (.*)/i, res => {
     if (res.match[1]) {
       const url = res.match[1];
-      let { sites } = bot.brain.data;
-      let siteToDelete = sites.find(s => s === url);
+      const { sites } = bot.brain.data;
+      const siteToDelete = sites.find(s => s === url);
       if (siteToDelete) {
         const updatedSites = sites.filter(s => s !== url);
         bot.brain.data.sites = updatedSites;
@@ -103,75 +107,43 @@ module.exports = function(bot) {
     }
   });
 
-  bot.respond(/sonos say (.*)/i, res => {
-    const command = res.match[1];
-    talkViaSonos(bot, command);
-  });
-
-  bot.respond(/(neste bybane|nbb)/i, res => {
-    res.send("Finner ut når neste bybane går.");
-    skyss.getNextBybane().then(data => {
-      const now = moment().format("HH:mm");
-      const startTime = data[0].start;
-      talkViaSonos(
-        bot,
-        `Klokken er nå ${now}. Neste bybane går klokken ${startTime} fra Brann Stadion til Byparken.`
-      );
-      res.send(
-        `Klokken er nå ${now}. Neste bybane går kl. ${startTime} fra Brann Stadion til Byparken.`
-      );
-    });
-  });
-
-  bot.respond(/nosay (neste bybane|nbb)/i, res => {
-    res.send("Finner ut når neste bybane går.");
-    skyss.getNextBybane().then(data => {
-      const now = moment().format("HH:mm");
-      const startTime = data[0].start;
-      res.send(
-        `Klokken er nå ${now}. Neste bybane går kl. ${startTime} fra Brann Stadion til Byparken.`
-      );
-    });
-  });
-
-  function talkViaSonos(bot, command) {
-    bot.http(`http://192.168.1.61:5005/sayall/${command}/nb-no/40`).get()(
-      function(err, response, body) {
-        if (err) {
-          res.send(`Jeg kunne dessverre ikke si ${res.match[1]}`);
-        }
-      }
-    );
+  function isDevEnvironment() {
+    const env = process.env.ENV === "dev" ? process.env.ENV : "production";
+    return "dev" === env;
   }
 
   function registerSuccess(site) {
-    influx.writePoints([
-      {
-        measurement: "uptime",
-        tags: { uptime_bot: site },
-        fields: {
-          status_name: "success",
-          status: true,
-          status_number: 1,
-          site_name: site
+    if (!isDevEnvironment) {
+      influx.writePoints([
+        {
+          measurement: "uptime",
+          tags: { uptime_bot: site },
+          fields: {
+            status_name: "success",
+            status: true,
+            status_number: 1,
+            site_name: site
+          }
         }
-      }
-    ]);
+      ]);
+    }
   }
 
   function registerDowntime(site) {
-    influx.writePoints([
-      {
-        measurement: "uptime",
-        tags: { uptime_bot: site },
-        fields: {
-          status_name: "failure",
-          status: false,
-          status_number: 0,
-          site_name: site
+    if (!isDevEnvironment) {
+      influx.writePoints([
+        {
+          measurement: "uptime",
+          tags: { uptime_bot: site },
+          fields: {
+            status_name: "failure",
+            status: false,
+            status_number: 0,
+            site_name: site
+          }
         }
-      }
-    ]);
+      ]);
+    }
   }
 
   function checkSites(checkByCommand) {
@@ -183,9 +155,13 @@ module.exports = function(bot) {
       );
     } else {
       sites.forEach(site => {
-        isReachable(site, { timeout: 60000 * 3 }).then(reachable => {
+        isReachable(site, {
+          timeout: 1000 * config.noResponseTresholdInSeconds
+        }).then(reachable => {
           const now = new Date();
-          let successFull = bot.brain.data.success ? bot.brain.data.success : 0;
+          const successFull = bot.brain.data.success
+            ? bot.brain.data.success
+            : 0;
           if (reachable) {
             if (checkByCommand) {
               bot.messageRoom(
@@ -199,12 +175,12 @@ module.exports = function(bot) {
             if (successFull >= 60) {
               bot.messageRoom(
                 config.slackRoom,
-                `:white_check_mark: ${site} er online: ${now} and har vært online i 60 minutter`
+                `:white_check_mark: ${site} er online: ${now} og har vært online i 60 minutter`
               );
               bot.brain.data.success = 0;
               registerSuccess(site);
             } else {
-              bot.brain.data.success = successFull++;
+              bot.brain.data.success = successFull + 1;
               registerSuccess(site);
             }
           } else {
