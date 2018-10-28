@@ -1,12 +1,13 @@
 // Description:
 // 	This script checks a list of websites found in config/config.js and notifies the web admin via
 // 	Slack if the sites are down. The bot runs a cronjob every minute to monitor the sites
-
+//
 // Configuration:
 // 	You will need to set a valid HUBOT_SLACK_TOKEN provided by the Slack API to run this bot
-
+//
 // Commands:
 //    check - Runs a check on all sites you are monitoring
+//    config - Returns default config for Hubot
 // 	  hubot which sites - Lists the sites you are currently watching
 //    hubot add domain - Adds <domain> to the sites to monitor and check
 // 	  hubot del domain - Deletes <domain> from the monitored sites
@@ -61,7 +62,6 @@ module.exports = function(bot) {
   });
 
   bot.respond(/(which sites|ws)/i, res => {
-    console.log(bot.brain);
     res.send(
       `Overvåker følgende sider: ${
         bot.brain.data.sites.length > 0
@@ -113,7 +113,7 @@ module.exports = function(bot) {
   }
 
   function registerSuccess(site) {
-    if (!isDevEnvironment) {
+    if (!isDevEnvironment()) {
       influx.writePoints([
         {
           measurement: "uptime",
@@ -130,7 +130,7 @@ module.exports = function(bot) {
   }
 
   function registerDowntime(site) {
-    if (!isDevEnvironment) {
+    if (!isDevEnvironment()) {
       influx.writePoints([
         {
           measurement: "uptime",
@@ -159,9 +159,7 @@ module.exports = function(bot) {
           timeout: 1000 * config.noResponseTresholdInSeconds
         }).then(reachable => {
           const now = new Date();
-          const successFull = bot.brain.data.success
-            ? bot.brain.data.success
-            : 0;
+          
           if (reachable) {
             if (checkByCommand) {
               bot.messageRoom(
@@ -171,18 +169,6 @@ module.exports = function(bot) {
               registerSuccess(site);
               return;
             }
-
-            if (successFull >= 60) {
-              bot.messageRoom(
-                config.slackRoom,
-                `:white_check_mark: ${site} er online: ${now} og har vært online i 60 minutter`
-              );
-              bot.brain.data.success = 0;
-              registerSuccess(site);
-            } else {
-              bot.brain.data.success = successFull + 1;
-              registerSuccess(site);
-            }
           } else {
             bot.messageRoom(
               config.slackRoom,
@@ -191,7 +177,6 @@ module.exports = function(bot) {
               } :fire: ${site} er offline: ${now}. Du bør finne ut hvorfor :fire:`
             );
             registerDowntime(site);
-            bot.brain.data.success = 0;
           }
         });
       });
