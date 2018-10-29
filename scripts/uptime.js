@@ -17,6 +17,7 @@ const isReachable = require("is-reachable");
 const { CronJob } = require("cron");
 const config = require("../config/config.js");
 const Influx = require("influx");
+const botService = require("../bot/botService.js");
 
 const influx = new Influx.InfluxDB({
   host: process.env.INFLUX_HOST,
@@ -42,18 +43,7 @@ module.exports = function(bot) {
   bot.brain.data.sites = config.sites || [];
 
   bot.hear(/check/i, res => {
-    const { sites } = bot.brain.data;
-    if (sites.length === 0) {
-      res.send(
-        "Det er ingen sider i databasen som skal sjekkes. Legg til en side med kommandoen add <url>"
-      );
-      return;
-    }
-    res.send(
-      `Sjekker ${
-        sites.length > 1 ? `${sites.length} sider` : `${sites.length} side`
-      }`
-    );
+    botService.checkSitesByCommand(bot, res);
     checkSites(true);
   });
 
@@ -159,7 +149,7 @@ module.exports = function(bot) {
           timeout: 1000 * config.noResponseTresholdInSeconds
         }).then(reachable => {
           const now = new Date();
-          
+
           if (reachable) {
             if (checkByCommand) {
               bot.messageRoom(
