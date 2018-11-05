@@ -20,7 +20,7 @@ const Influx = require("influx");
 
 const influx = new Influx.InfluxDB({
   host: process.env.INFLUX_HOST,
-  database: process.env.INFLUX_DB,
+  database: process.env.INFLUX_DB || "homeassistant",
   schema: [
     {
       measurement: "uptime",
@@ -38,6 +38,7 @@ const influx = new Influx.InfluxDB({
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
   new CronJob("* * * * *", checkSites, null, true, tz);
+  new CronJob("0 9 * * *", checkBirthday, null, true, tz);
 
   bot.brain.data.sites = config.sites || [];
 
@@ -55,6 +56,10 @@ module.exports = function(bot) {
       }`
     );
     checkSites(true);
+  });
+
+  bot.hear(/bursdag/i, res => {
+    checkBirthday(bot, res);
   });
 
   bot.respond(/config/i, res => {
@@ -146,6 +151,31 @@ module.exports = function(bot) {
     }
   }
 
+  function checkBirthday(bot, res) {
+    bot
+      .http("https://forside.bekk.no/api/birthdays")
+      .header("Accept", "application/json")
+      .get()((err, response, body) => {
+      if (err) {
+        res.send("Kunne ikke hente bursdager");
+      }
+      const parsed = JSON.parse(body);
+      if (parsed.length <= 0) {
+        res.send("Ingen har bursdag i dag :disappointed:");
+        return;
+      }
+      const bursdagsTekst = JSON.parse(body)
+        .map(
+          person =>
+            `${person["Image"]}\n ${person["Name"]} blir ${
+              person["Age"]
+            } år i dag :birthday:`
+        )
+        .join("\n");
+      res.send(bursdagsTekst);
+    });
+  }
+
   function checkSites(checkByCommand) {
     const { sites } = bot.brain.data;
     if (sites.length <= 0) {
@@ -159,7 +189,7 @@ module.exports = function(bot) {
           timeout: 1000 * config.noResponseTresholdInSeconds
         }).then(reachable => {
           const now = new Date();
-          
+
           if (reachable) {
             if (checkByCommand) {
               bot.messageRoom(
