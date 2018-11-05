@@ -6,6 +6,7 @@
 // 	You will need to set a valid HUBOT_SLACK_TOKEN provided by the Slack API to run this bot
 //
 // Commands:
+//    bursdag - Returnerer hvem som har bursdag i dag i Bekk
 //    check - Runs a check on all sites you are monitoring
 //    config - Returns default config for Hubot
 // 	  hubot which sites - Lists the sites you are currently watching
