@@ -162,10 +162,11 @@ module.exports = function(bot) {
       }
       const parsed = JSON.parse(body);
       if (parsed.length <= 0) {
-        res.send("Ingen har bursdag i dag :disappointed:");
+        bot.messageRoom(config.slackRoom, "Ingen har bursdag i dag");
         return;
       }
-      const bursdagsTekst = JSON.parse(body)
+      let bursdagsTekst = "Disse har bursdag i dag:\n";
+      bursdagsTekst = JSON.parse(body)
         .map(
           person =>
             `${person["Image"]}\n ${person["Name"]} blir ${
@@ -173,7 +174,7 @@ module.exports = function(bot) {
             } år i dag :birthday:`
         )
         .join("\n");
-      res.send(bursdagsTekst);
+      bot.messageRoom(config.slackRoom, bursdagsTekst);
     });
   }
 
