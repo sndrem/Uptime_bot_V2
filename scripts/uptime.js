@@ -39,7 +39,7 @@ const influx = new Influx.InfluxDB({
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
   new CronJob("* * * * *", checkSites, null, true, tz);
-  new CronJob("0 9 * * *", checkBirthday, null, true, tz);
+  new CronJob("* * * * *", checkBirthday, null, true, tz);
 
   bot.brain.data.sites = config.sites || [];
 
@@ -152,13 +152,13 @@ module.exports = function(bot) {
     }
   }
 
-  function checkBirthday(bot, res) {
+  function checkBirthday() {
     bot
       .http("https://forside.bekk.no/api/birthdays")
       .header("Accept", "application/json")
       .get()((err, response, body) => {
       if (err) {
-        res.send("Kunne ikke hente bursdager");
+        bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
       }
       const parsed = JSON.parse(body);
       if (parsed.length <= 0) {
