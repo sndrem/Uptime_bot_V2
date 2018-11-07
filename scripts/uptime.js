@@ -39,7 +39,7 @@ const influx = new Influx.InfluxDB({
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
   new CronJob("* * * * *", checkSites, null, true, tz);
-  new CronJob("* * * * *", checkBirthday, null, true, tz);
+  new CronJob("0 9 * * *", checkBirthday, null, true, tz);
 
   bot.brain.data.sites = config.sites || [];
 
