@@ -6,7 +6,7 @@ const config = {
   ],
   webAdminSlackName: "@sndrem",
   slackRoom: "web-admin",
-  noResponseTresholdInSeconds: 30
+  noResponseTresholdInSeconds: 50
 };
 
 module.exports = config;
