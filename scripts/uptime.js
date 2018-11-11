@@ -17,26 +17,18 @@ require("dotenv").config();
 const isReachable = require("is-reachable");
 const { CronJob } = require("cron");
 const config = require("../config/config.js");
-const Influx = require("influx");
+const logger = require('../config/logging.js');
+let influx = null;
+if(!isDevEnvironment()) {
+  influx = require('../config/database.js');
+}
 
-const influx = new Influx.InfluxDB({
-  host: process.env.INFLUX_HOST,
-  database: process.env.INFLUX_DB || "homeassistant",
-  schema: [
-    {
-      measurement: "uptime",
-      fields: {
-        status_name: Influx.FieldType.STRING,
-        site_name: Influx.FieldType.STRING,
-        status: Influx.FieldType.BOOLEAN,
-        status_number: Influx.FieldType.INTEGER
-      },
-      tags: ["uptime_bot"]
-    }
-  ]
-});
+function isDevEnvironment() {
+  const env = process.env.ENV === "dev" ? process.env.ENV : "production";
+  return "dev" === env;
+}
 
-module.exports = function(bot) {
+module.exports = function (bot) {
   const tz = "Europe/Oslo";
   new CronJob("* * * * *", checkSites, null, true, tz);
   new CronJob("0 9 * * *", checkBirthday, null, true, tz);
@@ -44,8 +36,10 @@ module.exports = function(bot) {
   bot.brain.data.sites = config.sites || [];
 
   bot.hear(/check/i, res => {
+    logger.info('Sjekker om nettsidene er oppe');
     const { sites } = bot.brain.data;
     if (sites.length === 0) {
+      logger.info('Det er ingen sider i databasen som skal sjekkes. Databasen er tom.');
       res.send(
         "Det er ingen sider i databasen som skal sjekkes. Legg til en side med kommandoen add <url>"
       );
@@ -53,7 +47,7 @@ module.exports = function(bot) {
     }
     res.send(
       `Sjekker ${
-        sites.length > 1 ? `${sites.length} sider` : `${sites.length} side`
+      sites.length > 1 ? `${sites.length} sider` : `${sites.length} side`
       }`
     );
     checkSites(true);
@@ -70,9 +64,9 @@ module.exports = function(bot) {
   bot.respond(/(which sites|ws)/i, res => {
     res.send(
       `Overvåker følgende sider: ${
-        bot.brain.data.sites.length > 0
-          ? bot.brain.data.sites.join(", ")
-          : "Ingen. Legg til en side med kommandoen add <url>"
+      bot.brain.data.sites.length > 0
+        ? bot.brain.data.sites.join(", ")
+        : "Ingen. Legg til en side med kommandoen add <url>"
       }`
     );
   });
@@ -113,42 +107,45 @@ module.exports = function(bot) {
     }
   });
 
-  function isDevEnvironment() {
-    const env = process.env.ENV === "dev" ? process.env.ENV : "production";
-    return "dev" === env;
-  }
-
   function registerSuccess(site) {
     if (!isDevEnvironment()) {
-      influx.writePoints([
-        {
-          measurement: "uptime",
-          tags: { uptime_bot: site },
-          fields: {
-            status_name: "success",
-            status: true,
-            status_number: 1,
-            site_name: site
+      try {
+        influx.writePoints([
+          {
+            measurement: "uptime",
+            tags: { uptime_bot: site },
+            fields: {
+              status_name: "success",
+              status: true,
+              status_number: 1,
+              site_name: site
+            }
           }
-        }
-      ]);
+        ]);
+      } catch (error) {
+        logger.error('Kunne ikke skrive oppetid til influx. Det kan være fordi databasen ikke finnes, eller influx-db-hosten er nede.', error);
+      }
     }
   }
 
   function registerDowntime(site) {
     if (!isDevEnvironment()) {
-      influx.writePoints([
-        {
-          measurement: "uptime",
-          tags: { uptime_bot: site },
-          fields: {
-            status_name: "failure",
-            status: false,
-            status_number: 0,
-            site_name: site
+      try {
+        influx.writePoints([
+          {
+            measurement: "uptime",
+            tags: { uptime_bot: site },
+            fields: {
+              status_name: "failure",
+              status: false,
+              status_number: 0,
+              site_name: site
+            }
           }
-        }
-      ]);
+        ]);
+      } catch (error) {
+        logger.error('Kunne ikke skrive nedetid til influx. Det kan være fordi databasen ikke finnes, eller influx-db-hosten er nede.', error);
+      }
     }
   }
 
@@ -157,25 +154,25 @@ module.exports = function(bot) {
       .http("https://forside.bekk.no/api/birthdays")
       .header("Accept", "application/json")
       .get()((err, response, body) => {
-      if (err) {
-        bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
-      }
-      const parsed = JSON.parse(body);
-      if (parsed.length <= 0) {
-        bot.messageRoom(config.slackRoom, "Ingen har bursdag i dag");
-        return;
-      }
-      let bursdagsTekst = "Disse har bursdag i dag:\n";
-      bursdagsTekst = JSON.parse(body)
-        .map(
-          person =>
-            `${person["Image"]}\n ${person["Name"]} blir ${
+        if (err) {
+          bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
+        }
+        const parsed = JSON.parse(body);
+        if (parsed.length <= 0) {
+          bot.messageRoom(config.slackRoom, "Ingen har bursdag i dag");
+          return;
+        }
+        let bursdagsTekst = "Disse har bursdag i dag:\n";
+        bursdagsTekst = JSON.parse(body)
+          .map(
+            person =>
+              `${person["Image"]}\n ${person["Name"]} blir ${
               person["Age"]
-            } år i dag :birthday:`
-        )
-        .join("\n");
-      bot.messageRoom(config.slackRoom, bursdagsTekst);
-    });
+              } år i dag :birthday:`
+          )
+          .join("\n");
+        bot.messageRoom(config.slackRoom, bursdagsTekst);
+      });
   }
 
   function checkSites(checkByCommand) {
@@ -205,7 +202,7 @@ module.exports = function(bot) {
             bot.messageRoom(
               config.slackRoom,
               `${
-                config.webAdminSlackName
+              config.webAdminSlackName
               } :fire: ${site} er offline: ${now}. Du bør finne ut hvorfor :fire:`
             );
             registerDowntime(site);
