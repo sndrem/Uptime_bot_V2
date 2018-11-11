@@ -19,7 +19,7 @@ const { CronJob } = require("cron");
 const config = require("../config/config.js");
 const logger = require('../config/logging.js');
 let influx = null;
-if(!isDevEnvironment()) {
+if (!isDevEnvironment()) {
   influx = require('../config/database.js');
 }
 
@@ -150,11 +150,13 @@ module.exports = function (bot) {
   }
 
   function checkBirthday() {
+    logger.info('Sjekker bursdager')
     bot
       .http("https://forside.bekk.no/api/birthdays")
       .header("Accept", "application/json")
       .get()((err, response, body) => {
         if (err) {
+          logger.error('Kunne ikke hente bursdager', err);
           bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
         }
         const parsed = JSON.parse(body);

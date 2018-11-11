@@ -1,4 +1,4 @@
-const { createLogger, format, transports} = require('winston');
+const { createLogger, format, transports } = require('winston');
 const { combine, timestamp, label, prettyPrint } = format;
 const level = process.env.LOG_LEVEL || 'debug';
 const logger = createLogger({
@@ -15,6 +15,9 @@ const logger = createLogger({
         //
         new transports.File({ filename: 'error.log', level: 'error' }),
         new transports.File({ filename: 'combined.log' })
+    ],
+    exceptionHandlers: [
+        new transports.File({ filename: 'exceptions.log' })
     ]
 });
 
