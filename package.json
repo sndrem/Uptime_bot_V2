@@ -4,9 +4,6 @@
   "private": true,
   "author": "Sindre Moldeklev <sndrem@gmail.com>",
   "description": "Monitors the sites I am responsible for",
-  "scripts": {
-    "start": "HUBOT_SLACK_TOKEN=xoxb-274634631970-evKLjnXfgcL8G2G5R9lcf6D1 ./bin/hubot --adapter slack"
-  },
   "dependencies": {
     "cheerio": "^1.0.0-rc.2",
     "cron": "^1.3.0",
