@@ -167,13 +167,12 @@ module.exports = function(bot) {
         logger.error("Kunne ikke hente bursdager", err);
         bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
       }
-      const parsed = parseBody(body);
+      const parsed = parseBody(body, bot);
       if (parsed.length <= 0) {
         bot.messageRoom(config.slackRoom, "Ingen har bursdag i dag");
         return;
       }
       let bursdagsTekst = "Disse har bursdag i dag:\n";
-      console.log(body);
       bursdagsTekst = JSON.parse(body)
         .map(
           person =>
@@ -186,10 +185,14 @@ module.exports = function(bot) {
     });
   }
 
-  function parseBody(body) {
+  function parseBody(body, bot) {
     try {
       return JSON.parse(body);
     } catch (err) {
+      bot.messageRom(
+        config.slackRoom,
+        "Kunne ikke parse response fra API til Bekk. Prøv igjen senere..."
+      );
       logger.error("Kunne ikke parse body fra response", body);
       return [];
     }
