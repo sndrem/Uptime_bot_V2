@@ -8,6 +8,7 @@
 // Commands:
 //    bursdag - Returnerer hvem som har bursdag i dag i Bekk
 //    check - Runs a check on all sites you are monitoring
+//    sykkel||bysykkel - Sjekker ledige bysykler ved utvalgte stopp
 //    config - Returns default config for Hubot
 // 	  hubot which sites - Lists the sites you are currently watching
 //    hubot add domain - Adds <domain> to the sites to monitor and check
@@ -38,7 +39,8 @@ const influx = new Influx.InfluxDB({
 
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
-  new CronJob("* * * * *", checkSites, null, true, tz);
+  // new CronJob("* * * * *", checkSites, null, true, tz);
+  new CronJob("*/30 * * * *", checkBikeVacancy, null, true, tz);
   new CronJob("0 9 * * *", checkBirthday, null, true, tz);
 
   bot.brain.data.sites = config.sites || [];
@@ -61,6 +63,10 @@ module.exports = function(bot) {
 
   bot.hear(/bursdag/i, res => {
     checkBirthday(bot, res);
+  });
+
+  bot.hear(/sykkel|bysykkel/i, res => {
+    checkBikeVacancy(bot, res);
   });
 
   bot.respond(/config/i, res => {
@@ -150,6 +156,32 @@ module.exports = function(bot) {
         }
       ]);
     }
+  }
+
+  function checkBikeVacancy(bot, res) {
+    bot
+      .http("https://gbfs.urbansharing.com/oslobysykkel.no/station_status.json")
+      .header("Accept", "application/json")
+      .header("client-name", "sindrem-slackbot")
+      .get()((err, response, body) => {
+      if (err) {
+        res.send("Kunne ikke hente data fra Oslo Bysykkel");
+      }
+      const parsed = JSON.parse(body);
+      const { bysykkelStativer } = config;
+      const ids = bysykkelStativer.map(x => x.id);
+      const filteredStations = parsed.data.stations.filter(station => {
+        return ids.includes(station.station_id);
+      });
+      filteredStations.forEach(station => {
+        const response = `På stasjon: ${
+          bysykkelStativer.find(x => x.id === station.station_id).name
+        } er det ${station.num_bikes_available} ledige sykler og ${
+          station.num_docks_available
+        } ledige parkeringer.`;
+        bot.messageRoom(config.slackRoom, response);
+      });
+    });
   }
 
   function checkBirthday(bot, res) {
