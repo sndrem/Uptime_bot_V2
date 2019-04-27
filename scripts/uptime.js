@@ -32,7 +32,7 @@ function isDevEnvironment() {
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
   // new CronJob("* * * * *", checkSites, null, true, tz);
-  new CronJob("*/30 * * 1-5", checkBikeVacancy, null, true, tz);
+  new CronJob("0 */30 8-17 * * *", checkBikeVacancy, null, true, tz);
   new CronJob("0 9 * * *", checkBirthday, null, true, tz);
 
   bot.brain.data.sites = config.sites || [];
