@@ -32,8 +32,16 @@ function isDevEnvironment() {
 module.exports = function(bot) {
   const tz = "Europe/Oslo";
   // new CronJob("* * * * *", checkSites, null, true, tz);
-  new CronJob("0 */30 8-17 * * *", checkBikeVacancy, null, true, tz);
-  new CronJob("0 9 * * *", checkBirthday, null, true, tz);
+  const bikeJob = new CronJob(
+    "0 */30 8-18 * * *",
+    checkBikeVacancy,
+    null,
+    true,
+    tz
+  );
+  const birthdayJob = new CronJob("00 30 7 * *", checkBirthday, null, true, tz);
+  bikeJob.start();
+  birthdayJob.start();
 
   bot.brain.data.sites = config.sites || [];
 
@@ -163,14 +171,14 @@ module.exports = function(bot) {
     }
   }
 
-  function checkBikeVacancy(bot, res) {
+  function checkBikeVacancy() {
     bot
       .http("https://gbfs.urbansharing.com/oslobysykkel.no/station_status.json")
       .header("Accept", "application/json")
       .header("client-name", "sindrem-slackbot")
       .get()((err, response, body) => {
       if (err) {
-        res.send("Kunne ikke hente data fra Oslo Bysykkel");
+        bot.messageRoom(config.slackRoom, response);
       }
       const parsed = JSON.parse(body);
       const { bysykkelStativer } = config;
@@ -179,7 +187,7 @@ module.exports = function(bot) {
         return ids.includes(station.station_id);
       });
       filteredStations.forEach(station => {
-        const response = `På stasjon: ${
+        const response = `:bike: På stasjon: ${
           bysykkelStativer.find(x => x.id === station.station_id).name
         } er det ${station.num_bikes_available} ledige sykler og ${
           station.num_docks_available
@@ -189,7 +197,7 @@ module.exports = function(bot) {
     });
   }
 
-  function checkBirthday(bot, res) {
+  function checkBirthday() {
     bot
       .http("https://forside.bekk.no/api/birthdays")
       .header("Accept", "application/json")
