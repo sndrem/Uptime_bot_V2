@@ -66,11 +66,11 @@ module.exports = function(bot) {
   });
 
   bot.hear(/bursdag/i, res => {
-    checkBirthday(bot, res);
+    checkBirthday();
   });
 
   bot.hear(/sykkel|bysykkel/i, res => {
-    checkBikeVacancy(bot, res);
+    checkBikeVacancy();
   });
 
   bot.respond(/config/i, res => {
