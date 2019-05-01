@@ -33,7 +33,7 @@ module.exports = function(bot) {
   const tz = "Europe/Oslo";
   // new CronJob("* * * * *", checkSites, null, true, tz);
   const bikeJob = new CronJob(
-    "0 */30 8-18 * * *",
+    "0 */10 15-17 * * *",
     checkBikeVacancy,
     null,
     true,
