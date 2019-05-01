@@ -39,7 +39,13 @@ module.exports = function(bot) {
     true,
     tz
   );
-  const birthdayJob = new CronJob("00 30 7 * *", checkBirthday, null, true, tz);
+  const birthdayJob = new CronJob(
+    "* */30 7 * * 1-5",
+    checkBirthday,
+    null,
+    true,
+    tz
+  );
   bikeJob.start();
   birthdayJob.start();
 
@@ -171,30 +177,46 @@ module.exports = function(bot) {
     }
   }
 
-  function checkBikeVacancy() {
-    bot
-      .http("https://gbfs.urbansharing.com/oslobysykkel.no/station_status.json")
+  async function getData(url, callback) {
+    const request = bot
+      .http(url)
       .header("Accept", "application/json")
-      .header("client-name", "sindrem-slackbot")
-      .get()((err, response, body) => {
+      .header("client-name", "sindrem-slacbot")
+      .get();
+    request((err, res, body) => {
       if (err) {
-        bot.messageRoom(config.slackRoom, response);
+        callback(err, null);
       }
-      const parsed = JSON.parse(body);
-      const { bysykkelStativer } = config;
-      const ids = bysykkelStativer.map(x => x.id);
-      const filteredStations = parsed.data.stations.filter(station => {
-        return ids.includes(station.station_id);
-      });
-      filteredStations.forEach(station => {
-        const response = `:bike: På stasjon: ${
-          bysykkelStativer.find(x => x.id === station.station_id).name
-        } er det ${station.num_bikes_available} ledige sykler og ${
-          station.num_docks_available
-        } ledige parkeringer.`;
-        bot.messageRoom(config.slackRoom, response);
-      });
+      callback(null, JSON.parse(body));
     });
+  }
+
+  function checkBikeVacancy() {
+    getData(
+      "https://gbfs.urbansharing.com/oslobysykkel.no/station_status.json",
+      (err, data) => {
+        if (err) {
+          bot.messageRoom(
+            config.slackRoom,
+            ":white_frowning_face: Det var et problem ved henting av bysykkeldata :white_frowning_face:"
+          );
+        }
+        const { stations } = data.data;
+        const { bysykkelStativer } = config;
+        const ids = bysykkelStativer.map(x => x.id);
+        const filteredStations = stations.filter(station => {
+          return ids.includes(station.station_id);
+        });
+        filteredStations.forEach(station => {
+          const response = `:bike: På stasjon: ${
+            bysykkelStativer.find(x => x.id === station.station_id).name
+          } er det ${station.num_bikes_available} ledige sykler og ${
+            station.num_docks_available
+          } ledige parkeringer.`;
+          bot.messageRoom(config.slackRoom, response);
+        });
+      }
+    );
   }
 
   function checkBirthday() {
@@ -204,7 +226,7 @@ module.exports = function(bot) {
       .get()((err, response, body) => {
       if (err) {
         logger.error("Kunne ikke hente bursdager", err);
-        bot.messageRom(config.slackRoom, "Kunne ikke hente bursdager");
+        bot.messageRoom(config.slackRoom, "Kunne ikke hente bursdager");
       }
       const parsed = parseBody(body, bot);
       if (parsed.length <= 0) {
@@ -228,7 +250,7 @@ module.exports = function(bot) {
     try {
       return JSON.parse(body);
     } catch (err) {
-      bot.messageRom(
+      bot.messageRoom(
         config.slackRoom,
         "Kunne ikke parse response fra API til Bekk. Prøv igjen senere..."
       );

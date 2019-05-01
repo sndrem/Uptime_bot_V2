@@ -19,6 +19,14 @@ const config = {
     {
       id: "623",
       name: "7 Juni Plassen"
+    },
+    {
+      id: "404",
+      name: "Oslo Handelsgym"
+    },
+    {
+      id: "533",
+      name: "Sørvest for Slottsparken/Pascal"
     }
   ]
 };
