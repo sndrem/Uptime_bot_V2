@@ -40,7 +40,7 @@ module.exports = function(bot) {
     tz
   );
   const birthdayJob = new CronJob(
-    "* */30 7 * * 1-5",
+    "0 */30 7 * * 1-5",
     checkBirthday,
     null,
     true,
